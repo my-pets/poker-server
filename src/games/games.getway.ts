@@ -16,7 +16,7 @@ import { ShakeDto } from './dto/shake.dto';
 import { shake } from './helpers/shake.helper';
 
 @WebSocketGateway({
-    cors: { origin: 'https://my-pets.github.io/' },
+    cors: { origin: 'https://my-pets.github.io' },
 })
 export class GamesGateway implements OnGatewayConnection, OnGatewayDisconnect {
     constructor(
