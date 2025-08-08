@@ -18,9 +18,9 @@ export const saveCombination = (
         }),
     );
 
-    if (row <= 6) {
+    if (row <= 5) {
         const currentSchool: string[] = [];
-        for (let i = 1; i <= 6; i += 1) {
+        for (let i = 0; i <= 5; i += 1) {
             currentSchool.push(newTable[i][column]);
         }
         if (!currentSchool.some((val) => val === '')) {
@@ -30,37 +30,37 @@ export const saveCombination = (
             } else if (sum < 0) {
                 sum -= 50;
             }
-            newTable[7][column] = sum.toString();
+            newTable[6][column] = sum.toString();
         }
     }
 
     if (currentPlayerInfo.combsNumber === 50) {
         let sums = [0, 0, 0];
-        for (let i = 7; i <= 18; i += 1) {
+        for (let i = 6; i <= 17; i += 1) {
             sums[0] += Number(newTable[i][1]);
             sums[1] += Number(newTable[i][2]);
             sums[2] += Number(newTable[i][3]);
         }
 
-        newTable[19][1] = sums[0].toString();
-        newTable[19][2] = sums[1].toString();
-        newTable[19][3] = sums[2].toString();
+        newTable[18][1] = sums[0].toString();
+        newTable[18][2] = sums[1].toString();
+        newTable[18][3] = sums[2].toString();
 
-        newTable[19][0] = (sums[0] + sums[1] + sums[2]).toString();
+        newTable[18][0] = (sums[0] + sums[1] + sums[2]).toString();
     } else {
         currentDicesInfo.shakeCount = 0;
     }
 
     if (column === 1) {
         let downTo = 1;
-        if (row === 6) {
+        if (row === 5) {
             downTo += 1;
         }
         currentPlayerInfo.downIndex = currentPlayerInfo.downIndex + downTo;
     }
     if (column === 3) {
         let upTo = 1;
-        if (row === 8) {
+        if (row === 7) {
             upTo += 1;
         }
         currentPlayerInfo.upIndex = currentPlayerInfo.upIndex - upTo;
