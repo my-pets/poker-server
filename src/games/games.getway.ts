@@ -10,14 +10,13 @@ import { SavePlayerDto } from './dto/save-player.dto';
 import { GamesService } from './services/games.service';
 import { PlayersService } from './services/players.service';
 import { GameStatus } from './enums/game-status.enum';
-import { ConflictException } from '@nestjs/common';
 import { SaveCombinationDto } from './dto/save-combination.dto';
 import { saveCombination } from './helpers/save-combination.helper';
 import { ShakeDto } from './dto/shake.dto';
 import { shake } from './helpers/shake.helper';
 
 @WebSocketGateway({
-    cors: { origin: 'https://my-pets.github.io/poker/' },
+    cors: { origin: 'https://my-pets.github.io/' },
 })
 export class GamesGateway implements OnGatewayConnection, OnGatewayDisconnect {
     constructor(
