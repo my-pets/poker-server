@@ -47,9 +47,8 @@ export const saveCombination = (
         newTable[18][3] = sums[2].toString();
 
         newTable[18][0] = (sums[0] + sums[1] + sums[2]).toString();
-    } else {
-        currentDicesInfo.shakeCount = 0;
     }
+    currentDicesInfo.shakeCount = 0;
 
     if (column === 1) {
         let downTo = 1;

@@ -141,10 +141,10 @@ const square = (counts: number[], isFirstShake: boolean) => {
 const f = (counts: number[], isFirstShake: boolean) => {
     const value = counts.reduce(
         (acc, curr, index) => {
-            if (curr === 2) {
+            if (curr === 2 || curr === 5) {
                 acc[0] = (index + 1) * 2;
             }
-            if (curr === 3) {
+            if (curr === 3 || curr === 5) {
                 acc[1] = (index + 1) * 3;
             }
             return acc;

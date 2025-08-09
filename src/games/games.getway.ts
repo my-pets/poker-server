@@ -14,11 +14,14 @@ import { SaveCombinationDto } from './dto/save-combination.dto';
 import { saveCombination } from './helpers/save-combination.helper';
 import { ShakeDto } from './dto/shake.dto';
 import { shake } from './helpers/shake.helper';
+import { DEFAULT_COMBS_NUMBER_END } from './constants';
 
+import { OnModuleInit } from '@nestjs/common';
 @WebSocketGateway({
+    // cors: { origin: '*' },
     cors: { origin: 'https://my-pets.github.io' },
 })
-export class GamesGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class GamesGateway implements OnGatewayConnection, OnGatewayDisconnect, OnModuleInit {
     constructor(
         private readonly gamesService: GamesService,
         private readonly playersService: PlayersService,
@@ -27,6 +30,12 @@ export class GamesGateway implements OnGatewayConnection, OnGatewayDisconnect {
     server: Server;
 
     private clients = new Map<string, Socket>();
+
+    async onModuleInit() {
+        await this.gamesService.loadCache();
+        await this.playersService.loadCache();
+        this.logger('✅ Кэш игр и игроков загружен');
+    }
 
     logger(msg: string) {
         console.log(msg);
@@ -48,67 +57,65 @@ export class GamesGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     async getGameAndPlayer(client: Socket, gameCode: string, code: string) {
-        let game = await this.gamesService.get(gameCode);
+        let player = this.playersService.getFromCache(code);
 
-        let player = await this.playersService.getByClient(client.id);
         if (!player) {
-            player = await this.playersService.get(gameCode, code);
+            this.errorLogger('player not exists');
+        }
 
-            if (!player) {
-                this.errorLogger('no such player in this game');
-            }
-
-            player = await this.playersService.save({
-                code,
-                gameCode,
-                client: client.id,
-            });
-
-            game = await this.gamesService.get(gameCode);
-        } else if (player.game.code !== game.code) {
+        if (player.gameCode !== gameCode) {
             this.errorLogger('player in another game');
         }
+
+        if (player.client !== client.id) {
+            player = await this.playersService.update({
+                code,
+                client: client.id,
+            });
+            this.gamesService.updatePlayersCache(gameCode, player);
+        }
+
+        const game = this.gamesService.getFromCache(gameCode);
 
         return { game, player };
     }
 
     send(clientIds: string[], name: string, data: unknown) {
-        const clients = clientIds.map((clientId) => this.clients.get(clientId)).filter(client => !!client);
-
-        if (clients.length !== clientIds.length) {
-            this.errorLogger('клиенты старые')
-        }
-
-        clients.forEach((client) => client.emit(name, data));
+        this.logger(`Send ${name} to ${clientIds.join(', ')}`);
+        this.server.to(clientIds).emit(name, data);
     }
 
     @SubscribeMessage('enter-the-game')
     async enterGame(client: Socket, payload: SavePlayerDto) {
         const { gameCode, playersCount } = payload;
 
-        let game = await this.gamesService.get(gameCode);
+        if (!gameCode || !payload.code) return;
+
+        console.time('enter-the-game');
+        let game = this.gamesService.getFromCache(gameCode);
 
         if (!game) {
-            game = await this.gamesService.save({
+            game = await this.gamesService.create({
                 code: gameCode,
                 playersCount,
                 currentOrder: 1,
             });
         }
 
-        let player = await this.playersService.getByClient(client.id);
-        if (!player) {
-            player = await this.playersService.save(
-                {
-                    ...payload,
-                    client: client.id,
-                    isAdmin: game.players.length === 0,
-                },
-                game.players.length < game.playersCount,
-            );
-        }
+        const player = await this.playersService.save(
+            {
+                gameCode,
+                client: client.id,
+                code: payload.code,
+            },
+            true,
+        );
 
-        game = await this.gamesService.get(gameCode);
+        game = this.gamesService.updatePlayersCache(gameCode, player);
+
+        if ([GameStatus.IN_PROGRESS, GameStatus.ENDED].includes(game.status)) {
+            this.send([client.id], 'game', game);
+        }
 
         if (game.status === GameStatus.NEW && game.playersCount === game.players.length) {
             game = await this.gamesService.start(gameCode);
@@ -119,22 +126,16 @@ export class GamesGateway implements OnGatewayConnection, OnGatewayDisconnect {
                 game,
             );
         }
+        console.timeEnd('enter-the-game');
         this.logger(`${client.id} enter the game ${game.code} as ${player.code}`);
-    }
-
-    @SubscribeMessage('get-game')
-    async getGame(client: Socket, payload: SavePlayerDto) {
-        const { gameCode, code } = payload;
-
-        const { game } = await this.getGameAndPlayer(client, gameCode, code);
-
-        this.send([client.id], 'game', game);
     }
 
     @SubscribeMessage('save-combination')
     async saveCombination(client: Socket, payload: SaveCombinationDto) {
         const { gameCode, code, column, row } = payload;
 
+        if (!gameCode || !payload.code) return;
+        console.time('save');
         let { game, player } = await this.getGameAndPlayer(client, gameCode, code);
 
         if (game.status !== GameStatus.IN_PROGRESS) {
@@ -147,34 +148,44 @@ export class GamesGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
         const { table, currentPlayerInfo, currentDicesInfo } = saveCombination(game, player, { column, row });
 
-        await this.playersService.save({
-            code,
+        await this.playersService.update(
+            {
+                code,
+                client: client.id,
+                table,
+                currentPlayerInfo,
+            },
             gameCode,
-            client: client.id,
-            table,
-            currentPlayerInfo,
-        });
+        );
 
-        await this.gamesService.save({
-            code: gameCode,
+        game = await this.gamesService.update(gameCode, {
             currentOrder: game.currentOrder + 1 > game.playersCount ? 1 : game.currentOrder + 1,
             currentDicesInfo,
         });
-
-        game = await this.gamesService.get(gameCode);
 
         this.send(
             game.players.map(({ client }) => client),
             'game',
             game,
         );
+        
         this.logger(`${client.id} save combination`);
+
+        if (game.players.every(({ currentPlayerInfo }) => currentPlayerInfo.combsNumber === DEFAULT_COMBS_NUMBER_END)) {
+            await this.gamesService.update(gameCode, {
+                status: GameStatus.ENDED,
+            });
+        }
+
+        console.timeEnd('save');
     }
 
     @SubscribeMessage('shake')
     async shake(client: Socket, payload: ShakeDto) {
         const { gameCode, code, savedDices } = payload;
 
+        if (!gameCode || !payload.code) return;
+        console.time('shake');
         let { game, player } = await this.getGameAndPlayer(client, gameCode, code);
 
         if (game.status !== GameStatus.IN_PROGRESS) {
@@ -182,7 +193,6 @@ export class GamesGateway implements OnGatewayConnection, OnGatewayDisconnect {
         }
 
         if (player.order !== game.currentOrder) {
-            console
             this.errorLogger('не твоя очередь!!1!!!11');
         }
 
@@ -192,18 +202,18 @@ export class GamesGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
         const { currentDicesInfo } = shake(game, savedDices);
 
-        await this.gamesService.save({
-            code: gameCode,
+        this.send(
+            game.players.map(({ client }) => client),
+            'current-dices-info',
+            currentDicesInfo,
+        );
+
+        game = await this.gamesService.update(gameCode, {
             currentDicesInfo,
         });
 
-        game = await this.gamesService.get(gameCode);
-
-        this.send(
-            game.players.map(({ client }) => client),
-            'game',
-            game,
-        );
         this.logger(`${client.id} saked dices`);
+
+        console.timeEnd('shake');
     }
 }
