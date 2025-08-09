@@ -34,7 +34,7 @@ export const saveCombination = (
         }
     }
 
-    if (currentPlayerInfo.combsNumber === 50) {
+    if (currentPlayerInfo.combsNumber === 51) {
         let sums = [0, 0, 0];
         for (let i = 6; i <= 17; i += 1) {
             sums[0] += Number(newTable[i][1]);
