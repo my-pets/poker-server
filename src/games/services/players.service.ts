@@ -7,7 +7,7 @@ import { DEFAULT_CURRENT_PLAYER_INFO, DEFAULT_TABLE } from '../constants';
 
 @Injectable()
 export class PlayersService {
-  private playersCache = new Map<string, PlayerEntity>();
+    private playersCache = new Map<string, PlayerEntity>();
 
     constructor(
         @InjectRepository(PlayerEntity)
@@ -18,6 +18,12 @@ export class PlayersService {
         const players = await this.repository.find();
         players.forEach((player) => {
             this.playersCache.set(player.code, player);
+        });
+    }
+
+    public updateCache(playersData: PlayerEntity[]): void {
+        playersData.forEach((playerData) => {
+            this.playersCache.set(playerData.code, playerData);
         });
     }
 

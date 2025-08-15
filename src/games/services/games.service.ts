@@ -100,7 +100,7 @@ export class GamesService {
             throw new ConflictException('не хватает людей');
         }
 
-        return this.repository.save({
+        await this.repository.save({
             code,
             status: GameStatus.IN_PROGRESS,
             currentDicesInfo: DEFAULT_CURRENT_DICES_INFO,
@@ -111,5 +111,11 @@ export class GamesService {
                 currentPlayerInfo: DEFAULT_CURRENT_PLAYER_INFO,
             })),
         });
+
+        const game = await this.get(code);
+
+        this.gamesCache.set(game.code, game);
+
+        return game;
     }
 }

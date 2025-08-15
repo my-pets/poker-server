@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { envConfig } from './config';
 import { GamesModule } from './games/games.module';
-
+import { RedisModule } from './redis.module';
 @Module({
     imports: [
         TypeOrmModule.forRoot({
@@ -18,6 +18,7 @@ import { GamesModule } from './games/games.module';
             },
         }),
         GamesModule,
+        RedisModule,
     ],
 })
 export class AppModule {}

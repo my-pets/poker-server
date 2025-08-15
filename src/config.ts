@@ -26,6 +26,7 @@ export const envConfig = {
         password: getEnvValue('DB_PASSWORD'),
         logging: true,
     },
+    redisUrl: getEnvValue('REDIS_URL'),
 };
 
 export const typeORMConfig: TypeOrmModuleOptions = {
